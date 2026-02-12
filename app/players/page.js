@@ -1,27 +1,96 @@
+"use client";
+
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
-export default async function PlayerPage() {
-  const { data: players, error } = await supabase
-    .from("players")
-    .select("id, name, nickname");
+export default function PlayersPage() {
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
-  if (error) {
-    return <div>Error loading players.</div>;
+  async function fetchPlayers() {
+    const { data, error } = await supabase
+      .from("players")
+      .select("id, name, nickname")
+      .order("name", { ascending: true });
+
+    if (!error && data) {
+      setPlayers(data);
+    }
+
+    setLoading(false);
   }
 
-  return (
-    <div style={{ padding: 24 }}>
-      <h1>Players</h1>
+  useEffect(() => {
+    fetchPlayers();
+  }, []);
 
-      {players.map((player) => (
-        <div key={player.id}>
-          <Link href={`/players/${player.id}`}>
-            {player.name}
+  const filteredPlayers = useMemo(() => {
+    const term = search.toLowerCase();
+
+    return players.filter((player) =>
+      player.name.toLowerCase().includes(term) ||
+      (player.nickname &&
+        player.nickname.toLowerCase().includes(term))
+    );
+  }, [players, search]);
+
+  return (
+    <div className="space-y-8">
+
+      <h1 className="text-3xl font-bold">Players</h1>
+
+      {/* SEARCH BAR */}
+      <input
+        type="text"
+        placeholder="Search players..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="
+          w-full
+          bg-zinc-900
+          p-3
+          rounded-xl
+          outline-none
+          focus:ring-2
+          focus:ring-yellow-500
+        "
+      />
+
+      {loading && <p className="text-zinc-400">Loading...</p>}
+
+      {!loading && filteredPlayers.length === 0 && (
+        <p className="text-zinc-400">No players found.</p>
+      )}
+
+      {/* PLAYER LIST */}
+      <div className="space-y-4">
+        {filteredPlayers.map((player) => (
+          <Link
+            key={player.id}
+            href={`/players/${player.id}`}
+            className="
+              block
+              bg-zinc-900
+              rounded-xl
+              p-4
+              transition
+              text-center
+              hover:bg-yellow-500
+              hover:text-black
+              active:scale-95
+            "
+          >
+            <p className="text-lg font-semibold">
+              {player.nickname
+                ? `${player.name} (${player.nickname})`
+                : player.name}
+            </p>
           </Link>
-          {player.nickname && ` (${player.nickname})`}
-        </div>
-      ))}
+        ))}
+      </div>
+
     </div>
   );
 }

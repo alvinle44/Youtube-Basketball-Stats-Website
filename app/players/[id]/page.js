@@ -35,8 +35,8 @@ export default async function PlayerDetailPage({ params }) {
         player1_score,
         player2_score,
         is_ppv,
-        player1:player1_id ( id, name ),
-        player2:player2_id ( id, name )
+        player1:player1_id ( id, name, nickname ),
+        player2:player2_id ( id, name, nickname )
       )
     `)
     .eq("player_id", id)
@@ -71,7 +71,47 @@ export default async function PlayerDetailPage({ params }) {
       ? ((wins / gamesPlayed) * 100).toFixed(1)
       : "0.0";
 
-  // 5️⃣ Render page
+  let totalPoints = 0;
+  let totalFgm = 0;
+  let totalFga = 0;
+  let totalFtm = 0;
+  let totalFta = 0;
+  let total3pm = 0;
+  let total3pa = 0;
+  let totalTO = 0;
+
+  games?.forEach((row) => {
+    totalPoints += row.points ?? 0;
+    totalFgm += row.fg_made ?? 0;
+    totalFga += row.fg_attempted ?? 0;
+    totalFtm += row.ft_made ?? 0;
+    totalFta += row.ft_att ?? 0;
+    total3pm += row.three_made ?? 0;
+    total3pa += row.three_attempted ?? 0;
+    totalTO += row.turnover ?? 0;
+  });
+
+  const avgPoints = gamesPlayed ? (totalPoints / gamesPlayed).toFixed(1) : "0.0";
+  const avgFgm = gamesPlayed ? (totalFgm / gamesPlayed).toFixed(1) : "0.0";
+  const avgFga = gamesPlayed ? (totalFga / gamesPlayed).toFixed(1) : "0.0";
+  const avgFtm = gamesPlayed ? (totalFtm / gamesPlayed).toFixed(1) : "0.0";
+  const avgFta = gamesPlayed ? (totalFta / gamesPlayed).toFixed(1) : "0.0";
+  const avg3pm = gamesPlayed ? (total3pm / gamesPlayed).toFixed(1) : "0.0";
+  const avg3pa = gamesPlayed ? (total3pa / gamesPlayed).toFixed(1) : "0.0";
+  const avgTO = gamesPlayed ? (totalTO / gamesPlayed).toFixed(1) : "0.0";
+
+  const fgPct = totalFga
+  ? ((totalFgm / totalFga) * 100).toFixed(1)
+  : "0.0";
+
+  const ftPct = totalFta
+    ? ((totalFtm / totalFta) * 100).toFixed(1)
+    : "0.0";
+
+  const threePct = total3pa
+    ? ((total3pm / total3pa) * 100).toFixed(1)
+    : "0.0";
+  
   return (
     <div>
       {/* ===== PLAYER HEADER ===== */}
@@ -125,7 +165,6 @@ export default async function PlayerDetailPage({ params }) {
               <th>3PA</th>
               <th>3P%</th>
               <th>TO</th>
-              <th>Game</th>
             </tr>
           </thead>
 
@@ -157,12 +196,15 @@ export default async function PlayerDetailPage({ params }) {
 
                   <td>
                     <Link href={`/players/${opponent.id}`}>
-                      vs {opponent.name}
+                      {opponent.name} ({opponent.nickname})
                     </Link>
                   </td>
 
                   <td>
+                  <Link href={`/games/${game.id}`}>
                     {result} {playerScore}–{opponentScore}
+                    </Link>
+                    
                   </td>
 
                   <td>{row.points}</td>
@@ -203,14 +245,23 @@ export default async function PlayerDetailPage({ params }) {
 
                   <td>{row.turnover}</td>
 
-                  <td>
-                    <Link href={`/games/${game.id}`}>
-                      View
-                    </Link>
-                  </td>
                 </tr>
               );
             })}
+            <tr style={{ fontWeight: "bold", background: "#111" }}>
+              <td colSpan="3">Averages</td>
+              <td>{avgPoints}</td>
+              <td>{avgFgm}</td>
+              <td>{avgFga}</td>
+              <td>{fgPct}%</td>
+              <td>{avgFtm}</td>
+              <td>{avgFta}</td>
+              <td>{ftPct}%</td>
+              <td>{avg3pm}</td>
+              <td>{avg3pa}</td>
+              <td>{threePct}%</td>
+              <td>{avgTO}</td>
+            </tr>
           </tbody>
         </table>
       )}

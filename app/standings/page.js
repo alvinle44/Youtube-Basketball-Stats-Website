@@ -1,83 +1,185 @@
 import { supabase } from '@/lib/supabase'
+import StandingsTable from './StandingsTable'
 
-export default async function StandingsPage(){
-    const {data: players, error: playerError} = await supabase.from('players').select(`id, name, nickname`)
+export default async function StandingsPage() {
 
-    if (playerError){
-        return <div>Error Loading Players</div>
-    }
-    
-    const {data: games, error: gameError} = await supabase.from('games').select(`player1_id, player2_id, winner_id,'created_at`)
+  // GET PLAYERS
+  const { data: players, error: playerError } =
+    await supabase
+      .from('players')
+      .select('id, name, nickname')
 
-    if (gameError){
-        return <div>Error Loading Games</div>
-    }
+  if (playerError) {
+    return <div>Error Loading Players</div>
+  }
 
-    const standings = players.map(player => {
-        const gamesPlayed = games.filter(
-            g => g.player1_id === player.id || g.player2_id === player.id
-        ).sort((a,b) => new DataTransfer(b.created_at) - new Date(a.created_at))
-        const wins = gamesPlayed.filter(
-            g => g.winner_id === player.id
-        ).length
-        const losses = gamesPlayed.length - wins
-        const winPct = playerGames.length > 0 
-            ?( wins/ playerGames.length) * 100
-            :0
-        let streakCount = 0
-        let streakType = Null
-        for (const game of playerGames){
-            const isWin = game.winner_id = player.id
-            if (streakType === null){
-                streakType = isWin ? 'W':'L'
-                streakCount = 1
-            } else if (
-                (isWin && streakType === 'W') || (!isWin && streakType === 'L')
-            ){
-                streakCount++
-            }else{
-                break
-            }
-        }
-        const streak = streakType ? `${streakType}${streakCount}` : '-'
-        return {
-            ...player, wins, losses, gamesPlayed:gamesPlayed.length, winPct: winPct.toFixed(1), streak
-        }
+  // GET GAMES
+  const { data: games, error: gameError } =
+    await supabase
+      .from('games')
+      .select(`
+        id,
+        player1_id,
+        player2_id,
+        player1_score,
+        player2_score,
+        created_at,
+        game_date,
+        game_video_link
+      `)
+
+  if (gameError) {
+    return <div>Error Loading Games</div>
+  }
+
+  // BUILD BASE STANDINGS
+  const standings = players.map(player => {
+
+    const playerGames = games
+      .filter(g =>
+        g.player1_id === player.id ||
+        g.player2_id === player.id
+      )
+      .sort((a,b) =>
+        new Date(b.game_date) - new Date(a.game_date)
+      )
+
+    let wins = 0
+
+    playerGames.forEach(game => {
+
+      const isPlayer1 = game.player1_id === player.id
+
+      const playerScore = isPlayer1
+        ? game.player1_score
+        : game.player2_score
+
+      const opponentScore = isPlayer1
+        ? game.player2_score
+        : game.player1_score
+
+      if (playerScore > opponentScore) {
+        wins++
+      }
     })
-    standings.sort((a,b) => b.wins - a.wins)
 
-    return (
-        <div style={{padding:24}}>
-            <h1>Player Standings</h1>
-            <table border="1" cellpadding="8">
-                <thead>
-                    <tr>
-                        <th>Rank</th>
-                        <th>Player</th>
-                        <th>Wins</th>
-                        <th>Losses</th>
-                        <th>Games</th>
-                        <th>Win%</th>
-                        <th>Streak</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {standings.map((player, index) => (
-                        <tr key={player.id}>
-                            <td>{index+1}</td>
-                            <td>
-                                {player.name}
-                                {player.nickname && `(${player.nickname})`}
-                            </td>
-                            <td>{player.wins}</td>
-                            <td>{player.losses}</td>
-                            <td>{player.gamesPlayed}</td>
-                            <td>{players.winPct}</td>
-                            <td>{players.streak}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+    const losses = playerGames.length - wins
+
+    const winPct =
+      playerGames.length > 0
+        ? wins / playerGames.length
+        : 0
+        let streakCount = 0
+        let streakType = null
+        
+        for (const game of playerGames) {
+        
+          const isPlayer1 = game.player1_id === player.id
+        
+          const playerScore = isPlayer1
+            ? game.player1_score
+            : game.player2_score
+        
+          const opponentScore = isPlayer1
+            ? game.player2_score
+            : game.player1_score
+        
+          const isWin = playerScore > opponentScore
+        
+          if (streakType === null) {
+            streakType = isWin ? 'W' : 'L'
+            streakCount = 1
+          }
+          else if (
+            (isWin && streakType === 'W') ||
+            (!isWin && streakType === 'L')
+          ) {
+            streakCount++
+          }
+          else {
+            break
+          }
+        }
+        
+        const streak =
+          streakType ? `${streakType}${streakCount}` : '-'
+        
+        return {
+          ...player,
+          wins,
+          losses,
+          gamesPlayed: playerGames.length,
+          winPct,
+          streak
+        }
+
+  })
+
+  // CREATE LOOKUP FOR SOS
+  const playerMap = {}
+  standings.forEach(p => {
+    playerMap[p.id] = p
+  })
+
+  // CALCULATE SOS
+  standings.forEach(player => {
+
+    const playerGames = games.filter(
+      g => g.player1_id === player.id ||
+           g.player2_id === player.id
     )
+
+    if (playerGames.length === 0) {
+      player.sos = 0
+      return
+    }
+
+    let totalOpponentWinPct = 0
+
+    playerGames.forEach(game => {
+
+      const opponentId =
+        game.player1_id === player.id
+          ? game.player2_id
+          : game.player1_id
+
+      const opponent = playerMap[opponentId]
+
+      if (opponent) {
+        totalOpponentWinPct += opponent.winPct
+      }
+    })
+
+    player.sos =
+      totalOpponentWinPct / playerGames.length
+  })
+
+  // POWER SCORE
+  standings.forEach(player => {
+    const winWeight = 0.7
+    const sosWeight = 0.3
+
+    player.powerScore =
+      player.winPct * winWeight +
+      player.sos * sosWeight
+  })
+
+  // ASSIGN POWER RANK
+  const powerSorted = [...standings].sort(
+    (a,b) => b.powerScore - a.powerScore
+  )
+
+  powerSorted.forEach((player, index) => {
+    player.powerRank = index + 1
+  })
+
+  // DEFAULT SORT BY WINS
+  standings.sort((a,b) => b.wins - a.wins)
+
+  return (
+    <div className="space-y-6 px-6 py-8">
+      <h1 className="text-3xl font-bold">Player Standings</h1>
+      <StandingsTable standings={standings} />
+    </div>
+  )
 }
