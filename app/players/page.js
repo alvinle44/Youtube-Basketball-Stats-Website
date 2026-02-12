@@ -68,26 +68,32 @@ export default function PlayersPage() {
       <div className="space-y-4">
         {filteredPlayers.map((player) => (
           <Link
-            key={player.id}
-            href={`/players/${player.id}`}
-            className="
-              block
-              bg-zinc-900
-              rounded-xl
-              p-4
-              transition
-              text-center
-              hover:bg-yellow-500
-              hover:text-black
-              active:scale-95
-            "
-          >
-            <p className="text-lg font-semibold">
-              {player.nickname
-                ? `${player.name} (${player.nickname})`
-                : player.name}
-            </p>
-          </Link>
+          key={player.id}
+          href={`/players/${player.id}`}
+          className="
+            block
+            bg-zinc-900
+            rounded-xl
+            p-4
+            transition
+            text-center
+            hover:bg-yellow-500
+            hover:text-black
+            active:scale-95
+          "
+        >
+          <div className="flex flex-col items-center">
+            <span className="text-lg font-semibold">
+              {player.name}
+            </span>
+        
+            {player.nickname && (
+              <span className="text-xs text-zinc-400">
+                {player.nickname}
+              </span>
+            )}
+          </div>
+        </Link>
         ))}
       </div>
 

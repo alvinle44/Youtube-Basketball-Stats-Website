@@ -58,6 +58,9 @@ export default function StandingsTable({ standings }) {
               <th className="px-4 py-3 text-center">Win%</th>
               <th className="px-4 py-3 text-center">SOS</th>
               <th className="px-4 py-3 text-center">STRK</th>
+              <th className="px-4 py-3 text-center">PPV W</th>
+              <th className="px-4 py-3 text-center">PPV L</th>
+              <th className="px-4 py-3 text-center">PPV GP</th>
               <th className="px-4 py-3 text-center">Power</th>
             </tr>
           </thead>
@@ -79,13 +82,21 @@ export default function StandingsTable({ standings }) {
                 </td>
 
                 <td className="px-4 py-3">
-                <Link
-                  href={`/players/${player.id}`}
-                  className="hover:text-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition"
-                >
-                    {player.nickname
-                      ? `${player.name} (${player.nickname})`
-                      : player.name}
+                  <Link
+                    href={`/players/${player.id}`}
+                    className="hover:text-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-semibold">
+                        {player.name}
+                      </span>
+
+                      {player.nickname && (
+                        <span className="text-xs text-zinc-500">
+                          {player.nickname}
+                        </span>
+                      )}
+                    </div>
                   </Link>
                 </td>
 
@@ -117,7 +128,16 @@ export default function StandingsTable({ standings }) {
                 }`}>
                   {player.streak}
                 </td>
+                <td className="px-4 py-3 text-center">
+                  {player.ppvWins}
+                </td>
 
+                <td className="px-4 py-3 text-center">
+                  {player.ppvLosses}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {player.ppvGames}
+                </td>
                 <td className="px-4 py-3 text-center">
                   {player.powerRank}
                 </td>

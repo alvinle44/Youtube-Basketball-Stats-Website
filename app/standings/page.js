@@ -13,7 +13,7 @@ export default async function StandingsPage() {
     return <div>Error Loading Players</div>
   }
 
-  // GET GAMES
+  // GET GAMES (include is_ppv)
   const { data: games, error: gameError } =
     await supabase
       .from('games')
@@ -25,7 +25,7 @@ export default async function StandingsPage() {
         player2_score,
         created_at,
         game_date,
-        game_video_link
+        is_ppv
       `)
 
   if (gameError) {
@@ -41,10 +41,14 @@ export default async function StandingsPage() {
         g.player2_id === player.id
       )
       .sort((a,b) =>
-        new Date(b.game_date) - new Date(a.game_date)
+        new Date(b.game_date || b.created_at) -
+        new Date(a.game_date || a.created_at)
       )
 
     let wins = 0
+    let ppvWins = 0
+    let ppvLosses = 0
+    let ppvGames = 0
 
     playerGames.forEach(game => {
 
@@ -58,8 +62,20 @@ export default async function StandingsPage() {
         ? game.player2_score
         : game.player1_score
 
-      if (playerScore > opponentScore) {
+      const isWin = playerScore > opponentScore
+
+      if (isWin) {
         wins++
+      }
+
+      if (game.is_ppv) {
+        ppvGames++
+
+        if (isWin) {
+          ppvWins++
+        } else {
+          ppvLosses++
+        }
       }
     })
 
@@ -69,50 +85,54 @@ export default async function StandingsPage() {
       playerGames.length > 0
         ? wins / playerGames.length
         : 0
-        let streakCount = 0
-        let streakType = null
-        
-        for (const game of playerGames) {
-        
-          const isPlayer1 = game.player1_id === player.id
-        
-          const playerScore = isPlayer1
-            ? game.player1_score
-            : game.player2_score
-        
-          const opponentScore = isPlayer1
-            ? game.player2_score
-            : game.player1_score
-        
-          const isWin = playerScore > opponentScore
-        
-          if (streakType === null) {
-            streakType = isWin ? 'W' : 'L'
-            streakCount = 1
-          }
-          else if (
-            (isWin && streakType === 'W') ||
-            (!isWin && streakType === 'L')
-          ) {
-            streakCount++
-          }
-          else {
-            break
-          }
-        }
-        
-        const streak =
-          streakType ? `${streakType}${streakCount}` : '-'
-        
-        return {
-          ...player,
-          wins,
-          losses,
-          gamesPlayed: playerGames.length,
-          winPct,
-          streak
-        }
 
+    // STREAK CALCULATION
+    let streakCount = 0
+    let streakType = null
+
+    for (const game of playerGames) {
+
+      const isPlayer1 = game.player1_id === player.id
+
+      const playerScore = isPlayer1
+        ? game.player1_score
+        : game.player2_score
+
+      const opponentScore = isPlayer1
+        ? game.player2_score
+        : game.player1_score
+
+      const isWin = playerScore > opponentScore
+
+      if (streakType === null) {
+        streakType = isWin ? 'W' : 'L'
+        streakCount = 1
+      }
+      else if (
+        (isWin && streakType === 'W') ||
+        (!isWin && streakType === 'L')
+      ) {
+        streakCount++
+      }
+      else {
+        break
+      }
+    }
+
+    const streak =
+      streakType ? `${streakType}${streakCount}` : '-'
+
+    return {
+      ...player,
+      wins,
+      losses,
+      gamesPlayed: playerGames.length,
+      winPct,
+      ppvGames,
+      ppvWins,
+      ppvLosses,
+      streak
+    }
   })
 
   // CREATE LOOKUP FOR SOS

@@ -133,9 +133,19 @@ export default async function GameDetailPage({ params }) {
 
               <Link
                 href={`/players/${player.info.id}`}
-                className="text-xl font-semibold hover:gold-text transition"
+                className="hover:gold-text transition"
               >
-                {player.info.name}
+                <div className="flex flex-col items-center">
+                  <span className="text-xl font-semibold">
+                    {player.info.name}
+                  </span>
+
+                  {player.info.nickname && (
+                    <span className="text-xs text-zinc-400">
+                      {player.info.nickname}
+                    </span>
+                  )}
+                </div>
               </Link>
 
               <p className="text-5xl font-bold gold-text mt-2">
@@ -201,7 +211,17 @@ export default async function GameDetailPage({ params }) {
                       href={`/players/${player.info.id}`}
                       className="hover:gold-text transition"
                     >
-                      {player.info.name}
+                      <div className="flex flex-col">
+                        <span className="font-semibold">
+                          {player.info.name}
+                        </span>
+
+                        {player.info.nickname && (
+                          <span className="text-xs text-zinc-400">
+                            {player.info.nickname}
+                          </span>
+                        )}
+                      </div>
                     </Link>
                   </td>
 

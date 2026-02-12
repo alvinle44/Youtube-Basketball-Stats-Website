@@ -2,21 +2,16 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 
 export default async function PlayerDetailPage({ params }) {
-  // 1️⃣ Get player id from route
   const { id } = await params;
 
-  // 2️⃣ Fetch player info
-  const { data: player, error: playerError } = await supabase
+  const { data: player } = await supabase
     .from("players")
     .select("*")
     .eq("id", id)
     .single();
 
-  if (playerError || !player) {
-    return <div>Player not found</div>;
-  }
+  if (!player) return <div>Player not found</div>;
 
-  // 3️⃣ Fetch all games + stats for this player
   const { data: games } = await supabase
     .from("stats")
     .select(`
@@ -31,240 +26,341 @@ export default async function PlayerDetailPage({ params }) {
       fouls,
       game:game_id (
         id,
-        created_at,
+        game_date,
+        is_ppv,
         player1_score,
         player2_score,
-        is_ppv,
-        player1:player1_id ( id, name, nickname ),
-        player2:player2_id ( id, name, nickname )
+        player1:player1_id ( id, name ),
+        player2:player2_id ( id, name )
       )
     `)
     .eq("player_id", id)
-    .order("created_at", {
-      foreignTable: "game",
-      ascending: false,
-    });
+    .order("game_date", { foreignTable: "game", ascending: false });
 
-  // 4️⃣ Career summary calculations
   const gamesPlayed = games?.length ?? 0;
+
   let wins = 0;
   let losses = 0;
+  let ppvWins = 0;
+  let ppvLosses = 0;
 
-  games?.forEach((row) => {
-    const game = row.game;
-    const isPlayer1 = game.player1.id === id;
+  let totals = {
+    points: 0,
+    opponentPoints: 0,
+    fgm: 0,
+    fga: 0,
+    ftm: 0,
+    fta: 0,
+    tpm: 0,
+    tpa: 0,
+    turnovers: 0,
+    fouls: 0
+  };
 
-    const playerScore = isPlayer1
-      ? game.player1_score
-      : game.player2_score;
+  games?.forEach(row => {
 
-    const opponentScore = isPlayer1
-      ? game.player2_score
-      : game.player1_score;
+    const g = row.game;
+    const isPlayer1 = g.player1.id === id;
 
-    if (playerScore > opponentScore) wins++;
+    const playerScore = isPlayer1 ? g.player1_score : g.player2_score;
+    const opponentScore = isPlayer1 ? g.player2_score : g.player1_score;
+
+    const isWin = playerScore > opponentScore;
+
+    if (isWin) wins++;
     else losses++;
+
+    if (g.is_ppv) {
+      if (isWin) ppvWins++;
+      else ppvLosses++;
+    }
+
+    totals.points += row.points ?? 0;
+    totals.opponentPoints += opponentScore ?? 0;
+    totals.fgm += row.fg_made ?? 0;
+    totals.fga += row.fg_attempted ?? 0;
+    totals.ftm += row.ft_made ?? 0;
+    totals.fta += row.ft_att ?? 0;
+    totals.tpm += row.three_made ?? 0;
+    totals.tpa += row.three_attempted ?? 0;
+    totals.turnovers += row.turnover ?? 0;
+    totals.fouls += row.fouls ?? 0;
   });
 
-  const winPct =
-    gamesPlayed > 0
-      ? ((wins / gamesPlayed) * 100).toFixed(1)
-      : "0.0";
+  const avg = (val) =>
+    gamesPlayed ? (val / gamesPlayed).toFixed(1) : "0.0";
 
-  let totalPoints = 0;
-  let totalFgm = 0;
-  let totalFga = 0;
-  let totalFtm = 0;
-  let totalFta = 0;
-  let total3pm = 0;
-  let total3pa = 0;
-  let totalTO = 0;
-
-  games?.forEach((row) => {
-    totalPoints += row.points ?? 0;
-    totalFgm += row.fg_made ?? 0;
-    totalFga += row.fg_attempted ?? 0;
-    totalFtm += row.ft_made ?? 0;
-    totalFta += row.ft_att ?? 0;
-    total3pm += row.three_made ?? 0;
-    total3pa += row.three_attempted ?? 0;
-    totalTO += row.turnover ?? 0;
-  });
-
-  const avgPoints = gamesPlayed ? (totalPoints / gamesPlayed).toFixed(1) : "0.0";
-  const avgFgm = gamesPlayed ? (totalFgm / gamesPlayed).toFixed(1) : "0.0";
-  const avgFga = gamesPlayed ? (totalFga / gamesPlayed).toFixed(1) : "0.0";
-  const avgFtm = gamesPlayed ? (totalFtm / gamesPlayed).toFixed(1) : "0.0";
-  const avgFta = gamesPlayed ? (totalFta / gamesPlayed).toFixed(1) : "0.0";
-  const avg3pm = gamesPlayed ? (total3pm / gamesPlayed).toFixed(1) : "0.0";
-  const avg3pa = gamesPlayed ? (total3pa / gamesPlayed).toFixed(1) : "0.0";
-  const avgTO = gamesPlayed ? (totalTO / gamesPlayed).toFixed(1) : "0.0";
-
-  const fgPct = totalFga
-  ? ((totalFgm / totalFga) * 100).toFixed(1)
-  : "0.0";
-
-  const ftPct = totalFta
-    ? ((totalFtm / totalFta) * 100).toFixed(1)
+  const winPct = gamesPlayed
+    ? ((wins / gamesPlayed) * 100).toFixed(1)
     : "0.0";
 
-  const threePct = total3pa
-    ? ((total3pm / total3pa) * 100).toFixed(1)
+  const ppvGames = ppvWins + ppvLosses;
+
+  const ppvWinPct = ppvGames
+    ? ((ppvWins / ppvGames) * 100).toFixed(1)
     : "0.0";
-  
+
+  const fgPct = totals.fga
+    ? ((totals.fgm / totals.fga) * 100).toFixed(1)
+    : "0.0";
+
+  const ftPct = totals.fta
+    ? ((totals.ftm / totals.fta) * 100).toFixed(1)
+    : "0.0";
+
+  const threePct = totals.tpa
+    ? ((totals.tpm / totals.tpa) * 100).toFixed(1)
+    : "0.0";
+
   return (
-    <div>
-      {/* ===== PLAYER HEADER ===== */}
-      <h1>{player.name}</h1>
-      {player.nickname && <h2>({player.nickname})</h2>}
+    <div className="max-w-6xl mx-auto px-6 py-12 space-y-12">
 
-      {/* ===== PLAYER BIO ===== */}
-      <p>
-        {player.height && <>Height: {player.height} ft<br /></>}
-        {player.weight && <>Weight: {player.weight} lb<br /></>}
-        {player.hometown && <>Hometown: {player.hometown}<br /></>}
-        {player.college && <>College: {player.college}</>}
-      </p>
+      {/* PLAYER HEADER */}
+      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-10">
 
-      {/* ===== CAREER SUMMARY ===== */}
-      <div style={{ marginBottom: 24 }}>
-        <h3>Career Summary</h3>
-        <p>
-          <strong>Record:</strong> {wins}–{losses}
-        </p>
-        <p>
-          <strong>Win %:</strong> {winPct}%
-        </p>
-        <p>
-          <strong>Games Played:</strong> {gamesPlayed}
-        </p>
+      <div className="max-w-4xl mx-auto space-y-8">
+
+        {/* TOP ROW: IMAGE + NAME */}
+        <div className="flex items-center justify-center gap-10">
+
+          {/* PROFILE IMAGE */}
+          <div className="flex-shrink-0">
+            {player.avatar_url && (
+              <img
+                src={player.avatar_url}
+                alt={player.name}
+                className="h-40 object-contain"
+              />
+            )}
+          </div>
+
+          {/* NAME + SOCIAL */}
+          <div className="text-left space-y-2">
+
+            <h1 className="text-4xl font-bold">
+              {player.name}
+            </h1>
+
+            {player.nickname && (
+              <p className="text-zinc-400 text-lg">
+                ({player.nickname})
+              </p>
+            )}
+
+            {/* SOCIAL ICONS */}
+            <div className="flex gap-4 mt-3">
+
+              {player.instagram && (
+                <a
+                  href={player.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:scale-110 transition"
+                >
+                  <img
+                    src="/icons/instagram-color.png"
+                    alt="Instagram"
+                    className="w-10 h-10"
+                  />
+                </a>
+              )}
+
+              {player.youtube && (
+                <a
+                  href={player.youtube}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:scale-110 transition"
+                >
+                  <img
+                    src="/icons/youtube-color.png"
+                    alt="YouTube"
+                    className="w-10 h-10"
+                  />
+                </a>
+              )}
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* BIO INFO */}
+        <div className="text-center text-zinc-400 space-y-1">
+          {player.height && <p>Height: {player.height}</p>}
+          {player.weight && <p>Weight: {player.weight}</p>}
+          {player.hometown && <p>Hometown: {player.hometown}</p>}
+          {player.college && <p>College: {player.college}</p>}
+        </div>
+
+        {/* CAREER SUMMARY INLINE */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center pt-4">
+
+          <div>
+            <p className="text-zinc-400 text-sm">Record</p>
+            <p className="text-2xl font-bold gold-text">
+              {wins}–{losses}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-zinc-400 text-sm">Win %</p>
+            <p className="text-2xl font-bold">
+              {winPct}%
+            </p>
+          </div>
+
+          <div>
+            <p className="text-zinc-400 text-sm">PPV Record</p>
+            <p className="text-2xl font-bold">
+              {ppvWins}–{ppvLosses}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-zinc-400 text-sm">PPV Win %</p>
+            <p className="text-2xl font-bold">
+              {ppvWinPct}%
+            </p>
+          </div>
+
+        </div>
+
       </div>
 
-      {/* ===== GAME LOG ===== */}
-      <h3>Game Log</h3>
+      </div>
 
-      {(!games || games.length === 0) && (
-        <p>No games played yet.</p>
-      )}
+      {/* GAME LOG */}
+      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-x-auto">
 
-      {games && games.length > 0 && (
-        <table border="1" cellPadding="6">
-          <thead>
+        <h2 className="text-xl font-semibold p-6">
+          Game Log
+        </h2>
+
+        <table className="min-w-full text-sm text-center">
+
+          <thead className="bg-zinc-900 text-zinc-400 uppercase text-xs tracking-wider">
             <tr>
-              <th>Date</th>
-              <th>Opponent</th>
-              <th>Result</th>
-              <th>PTS</th>
-              <th>FGM</th>
-              <th>FGA</th>
-              <th>FG%</th>
-              <th>FTM</th>
-              <th>FTA</th>
-              <th>FT%</th>
-              <th>3PM</th>
-              <th>3PA</th>
-              <th>3P%</th>
-              <th>TO</th>
+              <th className="px-4 py-3 text-left">Date</th>
+              <th className="px-4 py-3 text-left">Opponent</th>
+              <th className="px-4 py-3">Result</th>
+              <th className="px-4 py-3">PTS</th>
+              <th className="px-4 py-3">Opp PTS</th>
+              <th className="px-4 py-3">FGM</th>
+              <th className="px-4 py-3">FGA</th>
+              <th className="px-4 py-3">FG%</th>
+              <th className="px-4 py-3">3PM</th>
+              <th className="px-4 py-3">3PA</th>
+              <th className="px-4 py-3">3P%</th>
+              <th className="px-4 py-3">FTM</th>
+              <th className="px-4 py-3">FTA</th>
+              <th className="px-4 py-3">FT%</th>
+              <th className="px-4 py-3">TO</th>
+              <th className="px-4 py-3">Fouls</th>
             </tr>
           </thead>
 
           <tbody>
-            {games.map((row) => {
-              const game = row.game;
-              const isPlayer1 = game.player1.id === id;
+
+            {games?.map((row, index) => {
+
+              const g = row.game;
+              const isPlayer1 = g.player1.id === id;
 
               const opponent = isPlayer1
-                ? game.player2
-                : game.player1;
+                ? g.player2
+                : g.player1;
 
               const playerScore = isPlayer1
-                ? game.player1_score
-                : game.player2_score;
+                ? g.player1_score
+                : g.player2_score;
 
               const opponentScore = isPlayer1
-                ? game.player2_score
-                : game.player1_score;
+                ? g.player2_score
+                : g.player1_score;
 
               const result =
                 playerScore > opponentScore ? "W" : "L";
 
               return (
-                <tr key={game.id}>
-                  <td>
-                    {new Date(game.created_at).toLocaleDateString()}
+                <tr key={g.id}
+                    className={index % 2 === 0 ? "bg-zinc-900/40" : ""}>
+
+                  <td className="px-4 py-3 text-left">
+                    {new Date(g.game_date).toLocaleDateString()}
                   </td>
 
-                  <td>
-                    <Link href={`/players/${opponent.id}`}>
-                      {opponent.name} ({opponent.nickname})
+                  <td className="px-4 py-3 text-left">
+                    <Link
+                      href={`/players/${opponent.id}`}
+                      className="hover:gold-text"
+                    >
+                      {opponent.name}
                     </Link>
                   </td>
 
-                  <td>
-                  <Link href={`/games/${game.id}`}>
+                  <td className={`px-4 py-3 font-semibold ${
+                    result === "W"
+                      ? "text-green-400"
+                      : "text-red-400"
+                  }`}>
                     {result} {playerScore}–{opponentScore}
-                    </Link>
-                    
                   </td>
 
                   <td>{row.points}</td>
-
+                  <td>{opponentScore}</td> 
                   <td>{row.fg_made}</td>
                   <td>{row.fg_attempted}</td>
                   <td>
                     {row.fg_attempted
-                      ? `${(
-                          (row.fg_made / row.fg_attempted) *
-                          100
-                        ).toFixed(1)}%`
+                      ? `${((row.fg_made / row.fg_attempted) * 100).toFixed(1)}%`
                       : "-"}
                   </td>
-
-                  <td>{row.ft_made}</td>
-                  <td>{row.ft_att}</td>
-                  <td>
-                    {row.ft_att
-                      ? `${(
-                          (row.ft_made / row.ft_att) *
-                          100
-                        ).toFixed(1)}%`
-                      : "-"}
-                  </td>
-
                   <td>{row.three_made}</td>
                   <td>{row.three_attempted}</td>
                   <td>
                     {row.three_attempted
-                      ? `${(
-                          (row.three_made /
-                            row.three_attempted) *
-                          100
-                        ).toFixed(1)}%`
+                      ? `${((row.three_made / row.three_attempted) * 100).toFixed(1)}%`
                       : "-"}
                   </td>
-
+                  <td>{row.ft_made}</td>
+                  <td>{row.ft_att}</td>
+                  <td>
+                    {row.ft_att
+                      ? `${((row.ft_made / row.ft_att) * 100).toFixed(1)}%`
+                      : "-"}
+                  </td>
                   <td>{row.turnover}</td>
+                  <td>{row.fouls}</td>
 
                 </tr>
               );
             })}
-            <tr style={{ fontWeight: "bold", background: "#111" }}>
+
+            {/* Averages Row */}
+            <tr className="bg-zinc-900 font-semibold">
               <td colSpan="3">Averages</td>
-              <td>{avgPoints}</td>
-              <td>{avgFgm}</td>
-              <td>{avgFga}</td>
+              <td>{avg(totals.points)}</td>
+              <td>{avg(totals.opponentPoints)}</td>
+              <td>{avg(totals.fgm)}</td>
+              <td>{avg(totals.fga)}</td>
               <td>{fgPct}%</td>
-              <td>{avgFtm}</td>
-              <td>{avgFta}</td>
-              <td>{ftPct}%</td>
-              <td>{avg3pm}</td>
-              <td>{avg3pa}</td>
+              <td>{avg(totals.tpm)}</td>
+              <td>{avg(totals.tpa)}</td>
               <td>{threePct}%</td>
-              <td>{avgTO}</td>
+              <td>{avg(totals.ftm)}</td>
+              <td>{avg(totals.fta)}</td>
+              <td>{ftPct}%</td>
+              <td>{avg(totals.turnovers)}</td>
+              <td>{avg(totals.fouls)}</td>
             </tr>
+
           </tbody>
         </table>
-      )}
+
+      </div>
+
     </div>
   );
 }
